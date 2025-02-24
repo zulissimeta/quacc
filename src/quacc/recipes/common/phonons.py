@@ -50,6 +50,7 @@ def phonon_subflow(
     t_max: float = 1000,
     phonopy_kwargs: dict[str, Any] | None = None,
     additional_fields: dict[str, Any] | None = None,
+    forces_subflow_kwargs: dict[str, Any] | None = None,
 ) -> PhononSchema:
     """
     Calculate phonon properties using the Phonopy package.
@@ -118,7 +119,7 @@ def phonon_subflow(
         for s in phonopy.supercells_with_displacements
     ]
 
-    @subflow
+    @subflow(**forces_subflow_kwargs)
     def _get_forces_subflow(supercells: list[Atoms]) -> list[dict]:
         return [
             force_job(supercell) for supercell in supercells if supercell is not None
@@ -139,9 +140,13 @@ def phonon_subflow(
             output["results"]["forces"][: len(phonopy.supercell)]
             for output in force_job_results
         ]
+        supercell_energies = [
+            output["results"]["energy"] for output in force_job_results
+        ]
         phonopy_results = PhonopyRunner().run_phonopy(
             phonopy,
             forces,
+            supercell_energies,
             symmetrize=bool(non_displaced_atoms),
             t_step=t_step,
             t_min=t_min,

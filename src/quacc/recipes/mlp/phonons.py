@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 )
 def phonon_flow(
     atoms: Atoms,
-    method: Literal["mace-mp-0", "m3gnet", "chgnet"],
+    method: Literal["mace-mp-0", "m3gnet", "chgnet", "fairchem"],
     symprec: float = 1e-4,
     min_lengths: float | tuple[float, float, float] | None = 20.0,
     supercell_matrix: (
@@ -45,6 +45,7 @@ def phonon_flow(
     t_max: float = 1000,
     job_params: dict[str, dict[str, Any]] | None = None,
     job_decorators: dict[str, Callable | None] | None = None,
+    forces_subflow_kwargs: dict[str, Callable | None] | None = None,
 ) -> PhononSchema:
     """
     Carry out a phonon workflow, consisting of:
@@ -117,4 +118,5 @@ def phonon_flow(
         t_min=t_min,
         t_max=t_max,
         additional_fields={"name": f"{method} Phonons"},
+        forces_subflow_kwargs=forces_subflow_kwargs,
     )

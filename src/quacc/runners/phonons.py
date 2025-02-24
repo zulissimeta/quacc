@@ -36,6 +36,7 @@ class PhonopyRunner(BaseRunner):
         self,
         phonon: Phonopy,
         forces: NDArray,
+        supercell_energies: NDArray,
         symmetrize: bool = False,
         t_step: float = 10,
         t_min: float = 0,
@@ -68,6 +69,7 @@ class PhonopyRunner(BaseRunner):
 
         # Run phonopy
         phonon.forces = forces
+        phonon.supercell_energies = supercell_energies
         phonon.produce_force_constants()
 
         if symmetrize:

@@ -45,6 +45,7 @@ def phonon_flow(
     t_max: float = 1000,
     job_params: dict[str, dict[str, Any]] | None = None,
     job_decorators: dict[str, Callable | None] | None = None,
+    thermo_job_decorator_kwargs: dict[str, Callable | None] | None = None,
 ) -> PhononSchema:
     """
     Carry out a phonon workflow, consisting of:
@@ -117,4 +118,5 @@ def phonon_flow(
         t_min=t_min,
         t_max=t_max,
         additional_fields={"name": f"{method} Phonons"},
+        thermo_job_decorator_kwargs=thermo_job_decorator_kwargs,
     )

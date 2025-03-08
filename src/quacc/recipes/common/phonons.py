@@ -32,7 +32,6 @@ if TYPE_CHECKING:
         from phonopy import Phonopy
 
 
-@subflow
 @requires(has_phonopy, "Phonopy must be installed. Run `pip install quacc[phonons]`")
 @requires(has_seekpath, "Seekpath must be installed. Run `pip install quacc[phonons]`")
 def phonon_subflow(
@@ -50,6 +49,7 @@ def phonon_subflow(
     t_max: float = 1000,
     phonopy_kwargs: dict[str, Any] | None = None,
     additional_fields: dict[str, Any] | None = None,
+    thermo_job_decorator_kwargs: dict[str, Any] | None = None,
 ) -> PhononSchema:
     """
     Calculate phonon properties using the Phonopy package.
@@ -118,13 +118,12 @@ def phonon_subflow(
         for s in phonopy.supercells_with_displacements
     ]
 
-    @subflow
     def _get_forces_subflow(supercells: list[Atoms]) -> list[dict]:
         return [
             force_job(supercell) for supercell in supercells if supercell is not None
         ]
 
-    @job
+    @job(**thermo_job_decorator_kwargs)
     def _thermo_job(
         atoms: Atoms,
         phonopy: Phonopy,

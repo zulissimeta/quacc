@@ -11,9 +11,7 @@ from ase.io import read
 from ase.mep import NEB
 from ase.optimize import BFGS
 from ase.vibrations import Vibrations
-from maggma.stores import MemoryStore
 from monty.json import MontyDecoder, jsanitize
-from monty.serialization import loadfn
 
 from quacc.schemas.ase import Summarize, VibSummarize
 
@@ -28,32 +26,14 @@ def test_summarize_run(tmpdir, monkeypatch):
     initial_atoms = read(os.path.join(RUN1, "POSCAR.gz"))
     atoms = read(os.path.join(RUN1, "OUTCAR.gz"))
     results = Summarize().run(atoms, initial_atoms)
-    assert results["nsites"] == len(atoms)
+    assert results["structure_metadata"]["nsites"] == len(atoms)
     assert results["atoms"] == atoms
     assert results["results"]["energy"] == atoms.get_potential_energy()
-    assert "pymatgen_version" in results["builder_meta"]
     assert results["input_atoms"]["atoms"] == initial_atoms
     assert Path(results["dir_name"]).is_dir()
 
-    json_results = loadfn(Path(results["dir_name"], "quacc_results.json.gz"))
-    assert json_results.keys() == results.keys()
-
-    assert json_results["nsites"] == results["nsites"]
-    assert json_results["results"]["energy"] == results["results"]["energy"]
-    assert json_results["atoms"].info == results["atoms"].info
-
 
 def test_summarize_run2(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
-    # Test DB
-    initial_atoms = read(os.path.join(RUN1, "POSCAR.gz"))
-    atoms = read(os.path.join(RUN1, "OUTCAR.gz"))
-    store = MemoryStore()
-    Summarize().run(atoms, initial_atoms, store=store)
-    assert store.count() == 1
-
-
-def test_summarize_run3(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
 
     # Make sure info tags are handled appropriately
@@ -65,7 +45,7 @@ def test_summarize_run3(tmp_path, monkeypatch):
     assert results["atoms"].info.get("test_dict", None) == {"hi": "there", "foo": "bar"}
 
 
-def test_summarize_run4(tmp_path, monkeypatch):
+def test_summarize_run3(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     # Make sure magnetic moments are handled appropriately
     initial_atoms = read(os.path.join(RUN1, "POSCAR.gz"))
@@ -83,7 +63,7 @@ def test_summarize_run4(tmp_path, monkeypatch):
     assert results["atoms"].calc is None
 
 
-def test_summarize_run5(tmp_path, monkeypatch):
+def test_summarize_run4(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     # Make sure Atoms magmoms were not moved if specified
     initial_atoms = read(os.path.join(RUN1, "POSCAR.gz"))
@@ -116,7 +96,7 @@ def test_summarize_opt_run1(tmp_path, monkeypatch):
     traj = read("test.traj", index=":")
 
     results = Summarize().opt(dyn)
-    assert results["nsites"] == len(atoms)
+    assert results["structure_metadata"]["nsites"] == len(atoms)
     assert results["atoms"] == traj[-1]
     assert results["results"]["energy"] == atoms.get_potential_energy()
     assert len(results["trajectory"]) == len(traj)
@@ -124,20 +104,8 @@ def test_summarize_opt_run1(tmp_path, monkeypatch):
     assert results["trajectory_results"][-1]["energy"] == results["results"]["energy"]
     assert "nid" in results
     assert "dir_name" in results
-    assert "pymatgen_version" in results["builder_meta"]
     assert results["parameters_opt"]["fmax"] == dyn.fmax
     assert results["parameters_opt"]["max_steps"] == 100
-
-    json_results = loadfn(Path(results["dir_name"], "quacc_results.json.gz"))
-
-    assert json_results.keys() == results.keys()
-
-    # assert things on the trajectory are the same
-    assert json_results["trajectory"] == results["trajectory"]
-    assert (
-        json_results["trajectory_results"][-1]["energy"]
-        == results["trajectory_results"][-1]["energy"]
-    )
 
     # Test custom traj
     assert (
@@ -155,10 +123,6 @@ def test_summarize_opt_run2(tmp_path, monkeypatch):
     atoms.calc = EMT()
     dyn = BFGS(atoms, trajectory="test.traj")
     dyn.run(steps=5)
-
-    store = MemoryStore()
-    Summarize().opt(dyn, check_convergence=False, store=store)
-    assert store.count() == 1
 
 
 def test_summarize_opt_run3(tmp_path, monkeypatch):
@@ -209,7 +173,7 @@ def test_vib_run1(monkeypatch, tmp_path):
 
     results = VibSummarize(vib).vib(is_molecule=True)
     assert results["atoms"] == input_atoms
-    assert results["natoms"] == len(atoms)
+    assert results["molecule_metadata"]["natoms"] == len(atoms)
     assert results["parameters_vib"]["delta"] == vib.delta
     assert results["parameters_vib"]["direction"] == "central"
     assert results["parameters_vib"]["method"] == "standard"
@@ -217,7 +181,6 @@ def test_vib_run1(monkeypatch, tmp_path):
     assert results["parameters_vib"]["nfree"] == 2
     assert "nid" in results
     assert "dir_name" in results
-    assert "pymatgen_version" in results["builder_meta"]
     assert len(results["results"]["vib_freqs_raw"]) == 6
     assert results["results"]["vib_freqs_raw"][0] == pytest.approx(0, rel=1e-5)
     assert results["results"]["vib_freqs_raw"][-1] == pytest.approx(928.1447554058556)
@@ -233,9 +196,6 @@ def test_vib_run1(monkeypatch, tmp_path):
     assert len(results["results"]["vib_energies"]) == 1
     assert results["results"]["vib_energies"][0] == pytest.approx(0.11507528256667966)
 
-    json_results = loadfn(Path(results["dir_name"], "quacc_results.json.gz"))
-    assert json_results.keys() == results.keys()
-
 
 def test_vib_run2(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
@@ -248,7 +208,7 @@ def test_vib_run2(monkeypatch, tmp_path):
 
     results = VibSummarize(vib).vib(is_molecule=False)
     assert results["atoms"] == input_atoms
-    assert results["natoms"] == len(atoms)
+    assert results["molecule_metadata"]["natoms"] == len(atoms)
     assert results["parameters_vib"]["delta"] == vib.delta
     assert results["parameters_vib"]["direction"] == "central"
     assert results["parameters_vib"]["method"] == "standard"
@@ -256,7 +216,6 @@ def test_vib_run2(monkeypatch, tmp_path):
     assert results["parameters_vib"]["nfree"] == 2
     assert "nid" in results
     assert "dir_name" in results
-    assert "pymatgen_version" in results["builder_meta"]
     assert len(results["results"]["vib_freqs_raw"]) == 6
     assert results["results"]["vib_freqs_raw"][0] == pytest.approx(0, rel=1e-5)
     assert results["results"]["vib_freqs_raw"][-1] == pytest.approx(928.1447554058556)
@@ -278,6 +237,7 @@ def test_summarize_vib_and_thermo_run1(tmp_path, monkeypatch):
 
     # Make sure metadata is made
     atoms = molecule("N2")
+    atoms.set_initial_magnetic_moments([0.0, 0.0])
     atoms.calc = EMT()
     input_atoms = deepcopy(atoms)
     vib = Vibrations(atoms)
@@ -285,7 +245,7 @@ def test_summarize_vib_and_thermo_run1(tmp_path, monkeypatch):
 
     results = VibSummarize(vib).vib_and_thermo("ideal_gas")
     assert results["atoms"] == input_atoms
-    assert results["natoms"] == len(atoms)
+    assert results["molecule_metadata"]["natoms"] == len(atoms)
     assert results["parameters_vib"]["delta"] == vib.delta
     assert results["parameters_vib"]["direction"] == "central"
     assert results["parameters_vib"]["method"] == "standard"
@@ -293,7 +253,6 @@ def test_summarize_vib_and_thermo_run1(tmp_path, monkeypatch):
     assert results["parameters_vib"]["nfree"] == 2
     assert "nid" in results
     assert "dir_name" in results
-    assert "pymatgen_version" in results["builder_meta"]
     assert len(results["results"]["vib_freqs_raw"]) == 6
     assert results["results"]["vib_freqs_raw"][0] == pytest.approx(0, rel=1e-5)
     assert results["results"]["vib_freqs_raw"][-1] == pytest.approx(928.1447554058556)
@@ -309,15 +268,13 @@ def test_summarize_vib_and_thermo_run1(tmp_path, monkeypatch):
     assert len(results["results"]["vib_energies"]) == 1
     assert results["results"]["vib_energies"][0] == pytest.approx(0.11507528256667966)
 
-    json_results = loadfn(Path(results["dir_name"], "quacc_results.json.gz"))
-    assert json_results.keys() == results.keys()
-
 
 def test_summarize_vib_and_thermo_run2(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
 
     # Make sure info tags are handled appropriately
     atoms = molecule("N2")
+    atoms.set_initial_magnetic_moments([0.0, 0.0])
     atoms.info["test_dict"] = {"hi": "there", "foo": "bar"}
     atoms.calc = EMT()
     vib = Vibrations(atoms)
@@ -325,9 +282,6 @@ def test_summarize_vib_and_thermo_run2(tmp_path, monkeypatch):
 
     results = VibSummarize(vib).vib_and_thermo("ideal_gas")
     assert results["atoms"].info.get("test_dict", None) == {"hi": "there", "foo": "bar"}
-
-    json_results = loadfn(Path(results["dir_name"], "quacc_results.json.gz"))
-    assert json_results.keys() == results.keys()
 
     # test document can be jsanitized and decoded
     d = jsanitize(results, strict=True, enum_values=True)
@@ -346,15 +300,12 @@ def test_summarize_vib_and_thermo_run3(tmp_path, monkeypatch):
 
     results = VibSummarize(vib).vib_and_thermo("harmonic")
     assert results["atoms"] == input_atoms
-    assert results["nsites"] == len(atoms)
+    assert results["structure_metadata"]["nsites"] == len(atoms)
     assert results["parameters_vib"]["delta"] == vib.delta
     assert len(results["results"]["vib_freqs_raw"]) == 6
     assert len(results["results"]["vib_energies_raw"]) == 6
     assert len(results["results"]["vib_freqs"]) == 6
     assert len(results["results"]["vib_energies"]) == 6
-
-    json_results = loadfn(Path(results["dir_name"], "quacc_results.json.gz"))
-    assert json_results.keys() == results.keys()
 
 
 def test_summarize_vib_and_thermo_run4(tmp_path, monkeypatch):
@@ -386,12 +337,13 @@ def test_summarize_vib_and_thermo_run5(tmp_path, monkeypatch):
 
     # Test ideal gas thermo
     atoms = molecule("H2")
+    atoms.set_initial_magnetic_moments([0.0, 0.0])
     atoms.calc = EMT()
     vib = Vibrations(atoms)
     vib.run()
     results = VibSummarize(vib).vib_and_thermo("ideal_gas")
 
-    assert results["natoms"] == len(atoms)
+    assert results["molecule_metadata"]["natoms"] == len(atoms)
     assert results["atoms"] == atoms
     assert len(results["parameters_thermo"]["vib_energies"]) == 1
     assert results["parameters_thermo"]["vib_energies"][-1] == pytest.approx(
@@ -404,7 +356,6 @@ def test_summarize_vib_and_thermo_run5(tmp_path, monkeypatch):
     assert results["results"]["energy"] == 0
     assert results["results"]["enthalpy"] == pytest.approx(0.59876099428484)
     assert results["results"]["gibbs_energy"] == pytest.approx(0.1962934153929657)
-    assert "pymatgen_version" in results["builder_meta"]
 
 
 def test_errors(tmp_path, monkeypatch):

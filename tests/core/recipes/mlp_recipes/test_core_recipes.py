@@ -5,7 +5,6 @@ import pytest
 torch = pytest.importorskip("torch")
 
 from importlib.util import find_spec
-from pathlib import Path
 
 import numpy as np
 from ase.build import bulk
@@ -14,13 +13,10 @@ from quacc.recipes.mlp.core import relax_job, static_job
 
 methods = []
 if has_mace := find_spec("mace"):
-    methods.append("mace-mp-0")
+    methods.append("mace-mp")
 
 if has_matgl := find_spec("matgl"):
-    methods.append("m3gnet")
-
-if has_chgnet := find_spec("chgnet"):
-    methods.append("chgnet")
+    methods.extend(["m3gnet", "chgnet", "tensornet"])
 
 if has_sevennet := find_spec("sevenn"):
     methods.append("sevennet")
@@ -28,15 +24,11 @@ if has_sevennet := find_spec("sevenn"):
 if has_orb := find_spec("orb_models"):
     methods.append("orb")
 
-if has_fairchem := find_spec("fairchem"):
-    methods.append("fairchem")
+if find_spec("fairchem"):
+    from huggingface_hub.utils._auth import get_token
 
-
-@pytest.mark.skipif(has_chgnet is None, reason="chgnet not installed")
-def test_bad_method():
-    atoms = bulk("Cu")
-    with pytest.raises(ValueError, match="Unrecognized method='bad_method'"):
-        static_job(atoms, method="bad_method")
+    if get_token():
+        methods.append("fairchem")
 
 
 def _set_dtype(size, type_="float"):
@@ -49,31 +41,41 @@ def _set_dtype(size, type_="float"):
 def test_static_job(tmp_path, monkeypatch, method):
     monkeypatch.chdir(tmp_path)
 
-    if method == "mace-mp-0":
+    if method == "mace-mp":
         _set_dtype(64)
     else:
         _set_dtype(32)
 
     if method == "fairchem":
-        calc_kwargs = {
-            "checkpoint_path": Path(__file__).parent / "eqV2_31M_omat_mp_salex.pt"
-        }
+        # Note that for this to work, you need HF_TOKEN env variable set!
+        calc_kwargs = {"name_or_path": "uma-s-1", "task_name": "omat"}
     else:
         calc_kwargs = {}
 
     ref_energy = {
-        "chgnet": -4.083308219909668,
-        "m3gnet": -4.0938973,
-        "mace-mp-0": -4.097862720291976,
+        "chgnet": -3.7441039085388184,
+        "m3gnet": -3.7398147583007812,
+        "tensornet": -3.7356371879577637,
+        "mace-mp": -4.097862720291976,
         "sevennet": -4.096191883087158,
         "orb": -4.093477725982666,
-        "fairchem": -4.098316669464111,
+        "fairchem": -3.7579006783217954,
     }
     atoms = bulk("Cu")
     output = static_job(atoms, method=method, **calc_kwargs)
     assert output["results"]["energy"] == pytest.approx(ref_energy[method], rel=1e-4)
     assert np.shape(output["results"]["forces"]) == (1, 3)
     assert output["atoms"] == atoms
+
+
+@pytest.mark.skipif(has_sevennet is None, reason="sevennet not installed")
+def test_static_job_with_dict_kwargs(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+
+    atoms = bulk("Cu")
+
+    # Make sure that pick_calculator works even with dictionary kwargs
+    static_job(atoms, method="sevennet", sevennet_config={"test": 1})
 
 
 def test_relax_job_missing_pynanoflann(monkeypatch):
@@ -84,7 +86,7 @@ def test_relax_job_missing_pynanoflann(monkeypatch):
 
     import quacc.recipes.mlp._base
 
-    quacc.recipes.mlp._base.pick_calculator.cache_clear()
+    quacc.recipes.mlp._base.pick_calculator.__wrapped__.cache_clear()
     monkeypatch.setattr("importlib.util.find_spec", mock_find_spec)
     monkeypatch.setattr("quacc.recipes.mlp._base.find_spec", mock_find_spec)
     with pytest.raises(ImportError, match=r"orb-models requires pynanoflann"):
@@ -95,25 +97,25 @@ def test_relax_job_missing_pynanoflann(monkeypatch):
 def test_relax_job(tmp_path, monkeypatch, method):
     monkeypatch.chdir(tmp_path)
 
-    if method == "mace-mp-0":
+    if method == "mace-mp":
         _set_dtype(64)
     else:
         _set_dtype(32)
 
     if method == "fairchem":
-        calc_kwargs = {
-            "checkpoint_path": Path(__file__).parent / "eqV2_31M_omat_mp_salex.pt"
-        }
+        # Note that for this to work, you need HF_TOKEN env variable set!
+        calc_kwargs = {"name_or_path": "uma-s-1", "task_name": "omat"}
     else:
         calc_kwargs = {}
 
     ref_energy = {
-        "chgnet": -32.665428161621094,
-        "m3gnet": -32.75003433227539,
-        "mace-mp-0": -32.78264569638644,
+        "chgnet": -29.952457427978516,
+        "m3gnet": -29.9184513092041,
+        "mace-mp": -32.78264569638644,
+        "tensornet": -29.884796142578125,
         "sevennet": -32.76924133300781,
         "orb": -32.7361946105957,
-        "fairchem": -32.80327224731445,
+        "fairchem": -30.004380887389797,
     }
 
     atoms = bulk("Cu") * (2, 2, 2)
@@ -134,7 +136,7 @@ def test_relax_job_dispersion(tmp_path, monkeypatch):
 
     atoms = bulk("Cu") * (2, 2, 2)
     atoms[0].position += 0.1
-    output = relax_job(atoms, method="mace-mp-0", dispersion=True)
+    output = relax_job(atoms, method="mace-mp", dispersion=True)
     assert output["results"]["energy"] == pytest.approx(-37.4518034464096)
     assert np.shape(output["results"]["forces"]) == (8, 3)
     assert output["atoms"] != atoms
@@ -145,25 +147,25 @@ def test_relax_job_dispersion(tmp_path, monkeypatch):
 def test_relax_cell_job(tmp_path, monkeypatch, method):
     monkeypatch.chdir(tmp_path)
 
-    if method == "mace-mp-0":
+    if method == "mace-mp":
         _set_dtype(64)
     else:
         _set_dtype(32)
 
     if method == "fairchem":
-        calc_kwargs = {
-            "checkpoint_path": Path(__file__).parent / "eqV2_31M_omat_mp_salex.pt"
-        }
+        # Note that for this to work, you need HF_TOKEN env variable set!
+        calc_kwargs = {"name_or_path": "uma-s-1", "task_name": "omat"}
     else:
         calc_kwargs = {}
 
     ref_energy = {
-        "chgnet": -32.66698455810547,
-        "m3gnet": -32.750858306884766,
-        "mace-mp-0": -32.8069374165035,
+        "chgnet": -29.966711044311523,
+        "m3gnet": -29.933645248413086,
+        "mace-mp": -32.8069374165035,
+        "tensornet": -29.901287078857422,
         "sevennet": -32.76963806152344,
         "orb": -32.73428726196289,
-        "fairchem": -32.82823944091797,
+        "fairchem": -30.005004590392726,
     }
 
     atoms = bulk("Cu") * (2, 2, 2)

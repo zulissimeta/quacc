@@ -7,6 +7,7 @@ from pathlib import Path
 from shutil import which
 
 import numpy as np
+import psutil
 import pytest
 from ase.atoms import Atoms
 from ase.build import bulk
@@ -25,6 +26,8 @@ FILE_DIR = Path(__file__).parent
 PSEUDO_DIR = FILE_DIR / "fake_pseudos"
 LOGGER = getLogger(__name__)
 LOGGER.propagate = True
+
+ncores = psutil.cpu_count(logical=False) or 1
 
 
 @pytest.fixture
@@ -50,6 +53,11 @@ def test_vanilla_vasp():
     atoms = bulk("Cu")
     calc = Vasp(atoms, use_custodian=False, incar_copilot=False)
     assert calc.asdict() == Vasp_().asdict()
+
+    atoms = bulk("Cu")
+    calc = Vasp(atoms, use_custodian=False, kspacing=0.5, incar_copilot=False)
+    assert calc.input_params["gamma"] is None
+    assert calc.kpts is None
 
     atoms = bulk("Cu")
     calc = Vasp(atoms, encut=None, incar_copilot=False)
@@ -94,6 +102,277 @@ def test_presets_mp():
     assert calc.xc.lower() == "scan"
     assert calc.string_params["algo"].lower() == "all"
     assert calc.exp_params["ediff"] == 1e-5
+
+
+def test_rosen_preset1():
+    atoms = bulk("Cu")
+    calc = Vasp(atoms, preset="RosenSetPBE", nsw=100)
+
+    assert calc.parameters == {
+        "algo": "all",
+        "ediff": 1e-06,
+        "ediffg": -0.02,
+        "efermi": "midgap",
+        "encut": 520,
+        "gamma": None,
+        "gga": "PE",
+        "gga_compat": False,
+        "ibrion": 2,
+        "ismear": 0,
+        "ivdw": 12,
+        "kpts": None,
+        "kspacing": 0.2,
+        "lasph": True,
+        "lcharg": False,
+        "lmaxmix": 4,
+        "lorbit": 11,
+        "lreal": False,
+        "lwave": False,
+        "ncore": int(np.sqrt(ncores)),
+        "nelm": 150,
+        "nelmin": 3,
+        "nsw": 100,
+        "pp": "PBE",
+        "prec": "accurate",
+        "setups": {
+            "Ac": "",
+            "Ag": "",
+            "Al": "",
+            "Am": "",
+            "Ar": "",
+            "As": "",
+            "At": "",
+            "Au": "",
+            "B": "",
+            "Ba": "_sv",
+            "Be": "",
+            "Bi": "_d",
+            "Br": "",
+            "C": "",
+            "Ca": "_sv",
+            "Cd": "",
+            "Ce": "",
+            "Cf": "",
+            "Cl": "",
+            "Cm": "",
+            "Co": "",
+            "Cr": "_pv",
+            "Cs": "_sv",
+            "Cu": "",
+            "Dy": "_3",
+            "Er": "_3",
+            "Eu": "_2",
+            "F": "",
+            "Fe": "",
+            "Fr": "_sv",
+            "Ga": "_d",
+            "Gd": "_3",
+            "Ge": "_d",
+            "H": "",
+            "He": "",
+            "Hf": "_pv",
+            "Hg": "",
+            "Ho": "_3",
+            "I": "",
+            "In": "_d",
+            "Ir": "",
+            "K": "_sv",
+            "Kr": "",
+            "La": "",
+            "Li": "_sv",
+            "Lu": "_3",
+            "Mg": "",
+            "Mn": "_pv",
+            "Mo": "_sv",
+            "N": "",
+            "Na": "_pv",
+            "Nb": "_sv",
+            "Nd": "_3",
+            "Ne": "",
+            "Ni": "",
+            "Np": "",
+            "O": "",
+            "Os": "",
+            "P": "",
+            "Pa": "",
+            "Pb": "_d",
+            "Pd": "",
+            "Pm": "_3",
+            "Po": "_d",
+            "Pr": "_3",
+            "Pt": "",
+            "Pu": "",
+            "Ra": "_sv",
+            "Rb": "_sv",
+            "Re": "",
+            "Rh": "_pv",
+            "Rn": "",
+            "Ru": "_pv",
+            "S": "",
+            "Sb": "",
+            "Sc": "_sv",
+            "Se": "",
+            "Si": "",
+            "Sm": "_3",
+            "Sn": "_d",
+            "Sr": "_sv",
+            "Ta": "_pv",
+            "Tb": "_3",
+            "Tc": "_pv",
+            "Te": "",
+            "Th": "",
+            "Ti": "_sv",
+            "Tl": "_d",
+            "Tm": "_3",
+            "U": "",
+            "V": "_sv",
+            "W": "_sv",
+            "Xe": "",
+            "Y": "_sv",
+            "Yb": "_2",
+            "Zn": "",
+            "Zr": "_sv",
+        },
+        "sigma": 0.05,
+        "xc": "pbe",
+    }
+
+
+def test_rosen_preset2():
+    atoms = bulk("Cu")
+    calc = Vasp(atoms, preset="RosenSetR2SCAN", nsw=100)
+    assert calc.parameters == {
+        "algo": "all",
+        "ediff": 1e-06,
+        "ediffg": -0.02,
+        "efermi": "midgap",
+        "encut": 520,
+        "gamma": None,
+        "gga_compat": False,
+        "ibrion": 2,
+        "ismear": 0,
+        "ivdw": 13,
+        "kpts": None,
+        "kspacing": 0.2,
+        "lasph": True,
+        "lcharg": False,
+        "lmaxmix": 4,
+        "lorbit": 11,
+        "lreal": False,
+        "lwave": False,
+        "metagga": "R2SCAN",
+        "ncore": int(np.sqrt(ncores)),
+        "nelm": 150,
+        "nelmin": 3,
+        "nsw": 100,
+        "pp": "PBE",
+        "prec": "accurate",
+        "setups": {
+            "Ac": "",
+            "Ag": "",
+            "Al": "",
+            "Am": "",
+            "Ar": "",
+            "As": "",
+            "At": "",
+            "Au": "",
+            "B": "",
+            "Ba": "_sv",
+            "Be": "",
+            "Bi": "_d",
+            "Br": "",
+            "C": "",
+            "Ca": "_sv",
+            "Cd": "",
+            "Ce": "",
+            "Cf": "",
+            "Cl": "",
+            "Cm": "",
+            "Co": "",
+            "Cr": "_pv",
+            "Cs": "_sv",
+            "Cu": "",
+            "Dy": "_3",
+            "Er": "_3",
+            "Eu": "_2",
+            "F": "",
+            "Fe": "",
+            "Fr": "_sv",
+            "Ga": "_d",
+            "Gd": "_3",
+            "Ge": "_d",
+            "H": "",
+            "He": "",
+            "Hf": "_pv",
+            "Hg": "",
+            "Ho": "_3",
+            "I": "",
+            "In": "_d",
+            "Ir": "",
+            "K": "_sv",
+            "Kr": "",
+            "La": "",
+            "Li": "_sv",
+            "Lu": "_3",
+            "Mg": "",
+            "Mn": "_pv",
+            "Mo": "_sv",
+            "N": "",
+            "Na": "_pv",
+            "Nb": "_sv",
+            "Nd": "_3",
+            "Ne": "",
+            "Ni": "",
+            "Np": "",
+            "O": "",
+            "Os": "",
+            "P": "",
+            "Pa": "",
+            "Pb": "_d",
+            "Pd": "",
+            "Pm": "_3",
+            "Po": "_d",
+            "Pr": "_3",
+            "Pt": "",
+            "Pu": "",
+            "Ra": "_sv",
+            "Rb": "_sv",
+            "Re": "",
+            "Rh": "_pv",
+            "Rn": "",
+            "Ru": "_pv",
+            "S": "",
+            "Sb": "",
+            "Sc": "_sv",
+            "Se": "",
+            "Si": "",
+            "Sm": "_3",
+            "Sn": "_d",
+            "Sr": "_sv",
+            "Ta": "_pv",
+            "Tb": "_3",
+            "Tc": "_pv",
+            "Te": "",
+            "Th": "",
+            "Ti": "_sv",
+            "Tl": "_d",
+            "Tm": "_3",
+            "U": "",
+            "V": "_sv",
+            "W": "_sv",
+            "Xe": "",
+            "Y": "_sv",
+            "Yb": "_2",
+            "Zn": "",
+            "Zr": "_sv",
+        },
+        "sigma": 0.05,
+        "vdw_a1": 0.51559235,
+        "vdw_a2": 5.77342911,
+        "vdw_s6": 1.0,
+        "vdw_s8": 0.6018749,
+        "xc": "r2scan",
+    }
 
 
 def test_lmaxmix():
@@ -156,6 +435,18 @@ def test_kspacing():
 
     calc = Vasp(atoms, kspacing=100, ismear=-5)
     assert calc.int_params["ismear"] == -5
+
+    calc = Vasp(atoms, kspacing=0.1, preset="BulkSet")
+    assert calc.float_params["kspacing"] == 0.1
+    assert calc.kpts is None
+
+    calc = Vasp(atoms, kspacing=0.1, gamma=True)
+    assert calc.float_params["kspacing"] == 0.1
+    assert calc.input_params["gamma"] is None
+    assert calc.kpts is None
+
+    calc = Vasp(atoms, kpts=[1, 1, 1], kgamma=True)
+    assert calc.bool_params["kgamma"] is None
 
 
 def test_kspacing_aggressive():
@@ -533,13 +824,6 @@ def test_ncore_aggressive():
         assert calc.int_params["ncore"] == 1
         assert calc.int_params["npar"] is None
 
-        calc = Vasp(atoms, npar=4, lelf=True)
-        assert calc.int_params["npar"] == 1
-
-        calc = Vasp(atoms, ncore=4, lelf=True)
-        assert calc.int_params["npar"] == 1
-        assert calc.int_params["ncore"] is None
-
 
 def test_ismear():
     atoms = bulk("Cu")
@@ -586,13 +870,16 @@ def test_ismear_aggressive():
         calc = Vasp(atoms, pmg_kpts={"line_density": 100}, ismear=1)
         assert calc.int_params["ismear"] == 0
         assert calc.float_params["sigma"] == 0.01
+        assert calc.todict()["reciprocal"] is True
 
         calc = Vasp(atoms, pmg_kpts={"line_density": 100}, ismear=0, sigma=1e-3)
         assert calc.int_params["ismear"] == 0
         assert calc.float_params["sigma"] == 1e-3
+        assert calc.todict()["reciprocal"] is True
 
         calc = Vasp(atoms, pmg_kpts={"line_density": 100}, ismear=-5)
         assert calc.int_params["ismear"] == 0
+        assert calc.todict()["reciprocal"] is True
 
         calc = Vasp(atoms, kspacing=1.0, ismear=-5)
         assert calc.int_params["ismear"] == 0
@@ -793,9 +1080,8 @@ def test_kpoint_schemes():
 
     atoms = bulk("Cu")
     calc = Vasp(atoms, pmg_kpts={"line_density": 100})
-    assert calc.kpts[-1] == pytest.approx(
-        np.array([1.30537091e00, 1.11022302e-16, 1.30537091e00])
-    )
+    assert calc.todict()["reciprocal"] is True
+    assert calc.kpts[-1] == pytest.approx(np.array([0.375, 0.75, 0.375]))
 
 
 def test_constraints():
@@ -941,6 +1227,14 @@ def test_ldau_mp():
     assert parameters["ldauu"] == [0, 0, 3.9]
     assert len(parameters["magmom"]) == 4
     assert parameters["magmom"] == [0.6, 0.6, 0.6, 5.0]
+
+
+def test_command():
+    atoms = bulk("Cu")
+    assert Vasp(atoms, kpts=[1, 1, 1]).command.strip() == "vasp_gam"
+    assert Vasp(atoms, kpts=[2, 1, 1]).command.strip() == "vasp_std"
+    assert Vasp(atoms, kspacing=50).command.strip() == "vasp_gam"
+    assert Vasp(atoms, kspacing=0.1).command.strip() == "vasp_std"
 
 
 @pytest.mark.skipif(which(get_settings().VASP_CMD), reason="VASP is installed")

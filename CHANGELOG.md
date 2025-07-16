@@ -4,6 +4,82 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project generally adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.0]
+
+### Added
+
+- Added support for TensorNet
+
+### Changed
+
+- Default MLP calculators have been updated across the board: M3GNET and CHGNet now default to the MatPES PBE models, CHGNet relies on matgl, and mace-mp-0 has been renamed mace-mp to get the default model.
+
+## [0.15.5]
+
+### Changed
+
+- Simplified FAIRChem MLP usage
+
+## [0.15.4]
+
+### Changed
+
+- `RosenPBESet.yaml` now uses ALGO = "All" instead of "Fast"
+
+## [0.15.3]
+
+### Added
+
+- Updated FAIRChem models to support UMA and redesigned FAIRChem repo
+
+## [0.15.2]
+
+### Fixed
+
+- Allow for `kpts=None` with VASP auto-swaps
+
+## [0.15.1]
+
+### Added
+
+- Added `RosenSetPBE.yaml` and `RosenSetR2CAN.yaml` for recommended VASP parameters that Rosen likes to use.
+
+### Changed
+
+- No longer automatically sets `NPAR = 1` when `LELF = True` due to convergence issues that can arise.
+
+## [0.15.0]
+
+### Fixed
+
+- Various dependency fixes
+
+## [0.14.0]
+
+### Fixed
+
+- Force `relax_cell=False` for elastic calculations
+
+### Removed
+
+- There is no more `quacc_results.json.gz` file written out to disk. This turned out to be way more trouble than it was worth, over-complicating recipes by requiring the use of schemas with knowledge of the current working directory at all times.
+- There is no more `STORE` quacc setting. Storing in databases will require calling the `results_to_db` function or using a workflow engine (e.g. Jobflow, FireWorks, Prefect, Covalent).
+
+## [0.13.0]
+
+### Added
+
+- New elastic workflows for MLIPs and EMT
+
+### Changed
+
+- The existing elastic workflow has been completely overhauled so that it is more practical t ouse
+- The results dictionary returned at the end of the run has been modified, such that the structure metadata is now put under the `structure_metadata` key rather than the root level of the dictionary. Should this breaking change prove undesirable by the community, it can be reverted.
+
+### Fixed
+
+- Fixed various type hints
+
 ## [0.12.3]
 
 ### Added

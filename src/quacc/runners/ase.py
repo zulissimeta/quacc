@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from ase.calculators import calculator
+from ase.calculators.gaussian import Gaussian
 from ase.filters import FrechetCellFilter
 from ase.io import Trajectory, read
 from ase.md.md import MolecularDynamics
@@ -43,7 +44,7 @@ if TYPE_CHECKING:
     from typing import Any
 
     from ase.atoms import Atoms
-    from ase.calculators.calculator import Calculator
+    from ase.calculators.calculator import BaseCalculator
     from ase.optimize.optimize import Dynamics, Optimizer
 
     from quacc.types import (
@@ -63,7 +64,7 @@ class Runner(BaseRunner):
     def __init__(
         self,
         atoms: Atoms | list[Atoms],
-        calculator: Calculator,
+        calculator: BaseCalculator,
         copy_files: SourceDirectory | dict[SourceDirectory, Filenames] | None = None,
     ) -> None:
         """
@@ -93,7 +94,7 @@ class Runner(BaseRunner):
             self.setup()
 
     def run_calc(
-        self, geom_file: str | None = None, properties: list[str] | None = None
+        self, properties: list[str] | None = None, geom_file: str | None = None
     ) -> Atoms:
         """
         This is a wrapper around `atoms.calc.calculate()`.
@@ -106,19 +107,25 @@ class Runner(BaseRunner):
             to specify this rather than relying on ASE to update the positions, as the
             latter behavior varies between codes.
         properties
-            List of properties to calculate. Defaults to ["energy"] if `None`.
+            A list of properties to obtain. Defaults to ["energy", "forces"]
 
         Returns
         -------
         Atoms
             The updated Atoms object.
         """
-        if properties is None:
-            properties = ["energy"]
+        if not properties:
+            properties = (
+                ["energy"]
+                if isinstance(self.atoms.calc, Gaussian)
+                else ["energy", "forces"]
+            )  # TODO: Use GaussianOptimizer to avoid this hack
 
         # Run calculation
         try:
-            self.atoms.calc.calculate(self.atoms, properties, calculator.all_changes)
+            self.atoms.calc.calculate(
+                self.atoms, properties=properties, system_changes=calculator.all_changes
+            )
         except Exception as exception:
             terminate(self.tmpdir, exception)
 
@@ -157,13 +164,13 @@ class Runner(BaseRunner):
         relax_cell: bool = False,
         fmax: float | None = 0.01,
         max_steps: int = 1000,
-        optimizer: Dynamics = BFGS,
+        optimizer: type[Dynamics] = BFGS,
         optimizer_kwargs: dict[str, Any] | None = None,
         store_intermediate_results: bool = False,
         fn_hook: Callable | None = None,
         run_kwargs: dict[str, Any] | None = None,
         filter_kwargs: dict[str, Any] | None = None,
-    ) -> Dynamics:
+    ) -> Optimizer:
         """
         This is a wrapper around the optimizers in ASE.
 
@@ -196,8 +203,8 @@ class Runner(BaseRunner):
 
         Returns
         -------
-        Dynamics
-            The ASE Dynamics object following an optimization.
+        Optimizer
+            The ASE Optimizer object following an optimization.
         """
         # Set defaults
         merged_optimizer_kwargs = recursive_dict_merge(
@@ -233,15 +240,16 @@ class Runner(BaseRunner):
         if relax_cell and self.atoms.pbc.any():
             self.atoms = FrechetCellFilter(self.atoms, **filter_kwargs)
 
+        # Define run kwargs
+        full_run_kwargs = {"steps": max_steps, **run_kwargs}
+        if not issubclass(optimizer, MolecularDynamics):
+            full_run_kwargs["fmax"] = fmax
+
         # Run optimization
-        full_run_kwargs = {"fmax": fmax, "steps": max_steps, **run_kwargs}
-        if issubclass(optimizer, MolecularDynamics):
-            full_run_kwargs.pop("fmax")
         try:
             with traj, optimizer(self.atoms, **merged_optimizer_kwargs) as dyn:
-                if issubclass(optimizer, SciPyOptimizer | MolecularDynamics):
-                    # https://gitlab.coms/ase/ase/-/issues/1475
-                    # https://gitlab.com/ase/ase/-/issues/1497
+                if issubclass(optimizer, SciPyOptimizer):
+                    # https://gitlab.com/ase/ase/-/issues/1475
                     dyn.run(**full_run_kwargs)
                 else:
                     for i, _ in enumerate(dyn.irun(**full_run_kwargs)):
@@ -365,7 +373,7 @@ class Runner(BaseRunner):
         relax_cell: bool = False,
         fmax: float = 0.01,
         max_steps: int | None = 1000,
-        optimizer: Optimizer = NEBOptimizer,
+        optimizer: type[Optimizer] = NEBOptimizer,
         optimizer_kwargs: dict[str, Any] | None = None,
         neb_kwargs: dict[str, Any] | None = None,
         run_kwargs: dict[str, Any] | None = None,

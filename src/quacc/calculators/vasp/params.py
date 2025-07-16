@@ -111,7 +111,7 @@ def get_param_swaps(
         calc.int_params["ismear"] != -5
         and calc.int_params["nsw"] in (None, 0)
         and (
-            np.prod(calc.kpts) >= 4
+            (calc.kpts is not None and np.prod(calc.kpts) >= 4)
             or (calc.float_params["kspacing"] and calc.float_params["kspacing"] <= 0.5)
         )
     ):
@@ -120,7 +120,7 @@ def get_param_swaps(
 
     if (
         calc.int_params["ismear"] == -5
-        and np.prod(calc.kpts) < 4
+        and (calc.kpts is not None and np.prod(calc.kpts) < 4)
         and calc.float_params["kspacing"] is None
     ):
         LOGGER.info(
@@ -190,7 +190,7 @@ def get_param_swaps(
                 LOGGER.info(
                     f"Recommending NCORE = {ncore} per the sqrt(# cores) suggestion by VASP."
                 )
-                calc.set(ncore=ncore)
+                calc.set(ncore=ncore, npar=None)
                 break
 
     if (
@@ -209,7 +209,7 @@ def get_param_swaps(
 
     if (
         calc.int_params["kpar"]
-        and calc.int_params["kpar"] > np.prod(calc.kpts)
+        and (calc.kpts is not None and calc.int_params["kpar"] > np.prod(calc.kpts))
         and calc.float_params["kspacing"] is None
     ):
         LOGGER.info(
@@ -228,12 +228,6 @@ def get_param_swaps(
             "Recommending ISYM = -1 because you are running an SOC calculation."
         )
         calc.set(isym=-1)
-
-    if calc.bool_params["lelf"] is True and (
-        calc.int_params["npar"] != 1 or calc.int_params["ncore"] != 1
-    ):
-        LOGGER.info("Recommending NPAR = 1 per the VASP manual.")
-        calc.set(npar=1, ncore=None)
 
     if (
         calc.string_params["metagga"]
@@ -300,8 +294,19 @@ def remove_unused_flags(user_calc_params: dict[str, Any]) -> dict[str, Any]:
         for ldau_flag in ldau_flags:
             user_calc_params.pop(ldau_flag, None)
 
+    # Handle kspacing flags
+    if user_calc_params.get("kspacing"):
+        user_calc_params["gamma"] = None
+        user_calc_params["kpts"] = None
+    else:
+        user_calc_params.pop("kgamma", None)
+
     # Remove None keys
-    none_keys = [k for k, v in user_calc_params.items() if v is None]
+    none_keys = [
+        k
+        for k, v in user_calc_params.items()
+        if v is None and k not in Vasp_().input_params
+    ]
     for none_key in none_keys:
         del user_calc_params[none_key]
 

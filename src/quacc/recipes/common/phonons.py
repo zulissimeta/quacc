@@ -56,7 +56,7 @@ def phonon_subflow(
     phonopy_kwargs: dict[str, Any] | None = None,
     additional_fields: dict[str, Any] | None = None,
     thermo_job_decorator_kwargs: dict[str, Any] | None = None,
-    num_partitions: int = 8,
+    num_partitions: int = 32,
 ) -> PhononSchema:
     """
     Calculate phonon properties using the Phonopy package.

@@ -105,7 +105,7 @@ def redecorate(func: Callable, decorator: Callable | None) -> Callable:
 def update_parameters(
     func: Callable,
     params: dict[str, Any],
-    decorator: Literal["job", "flow", "subflow"] | None = "job",
+    decorator: Literal["job", "flow", "subflow"] | None = None,
 ) -> Callable:
     """
     Update the parameters of a (potentially decorated) function.
@@ -206,9 +206,9 @@ def customize_funcs(
         if decorator := decorators.get(names[i]):
             func_ = redecorate(func_, decorator)
         if params := parameters.get("all"):
-            func_ = update_parameters(func_, params)
+            func_ = update_parameters(func_, params, decorator)
         if params := parameters.get(names[i]):
-            func_ = update_parameters(func_, params)
+            func_ = update_parameters(func_, params, decorator)
         updated_funcs.append(func_)
 
     return updated_funcs[0] if len(updated_funcs) == 1 else tuple(updated_funcs)
